@@ -1,7 +1,7 @@
 🐶 TrustDog DAO
 
 Open escrow & verification protocol for creators — powered by Solana.
-Contact handler@trustdog.co to work on the actual repo. 
+Contact handler@trustdog.co to work on the production repo. 
 🚀 Overview
 
 TrustDog DAO builds transparent, on-chain escrow for creator and advertiser deals.
