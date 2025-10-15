@@ -1,0 +1,51 @@
+{
+  "name": "ultimate-orchestrator",
+  "version": "1.0.0",
+  "description": "Ultimate Social Media Content Analysis Orchestrator",
+  "main": "api-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node api-server.js",
+    "dev": "node api-server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install-browsers": "npx playwright install --with-deps chromium",
+    "verify-tools": "yt-dlp --version && gallery-dl --version && ffmpeg -version"
+  },
+  "keywords": [
+    "social-media",
+    "content-analysis",
+    "instagram",
+    "tiktok",
+    "twitter",
+    "ai-analysis",
+    "qwen",
+    "playwright"
+  ],
+  "author": "TrustDog Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.40.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "sharp": "^0.32.6",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trustdog/ultimate-orchestrator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/trustdog/ultimate-orchestrator/issues"
+  },
+  "homepage": "https://github.com/trustdog/ultimate-orchestrator#readme"
+}

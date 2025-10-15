@@ -1,0 +1,331 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.artifacts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  type text NOT NULL,
+  ref text NOT NULL,
+  sha256 text,
+  meta jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  retention_ttl_days integer DEFAULT 30,
+  CONSTRAINT artifacts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.candidates (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  deal_id uuid NOT NULL,
+  platform USER-DEFINED NOT NULL,
+  platform_post_id text NOT NULL,
+  first_seen_at timestamp with time zone DEFAULT now(),
+  last_seen_at timestamp with time zone DEFAULT now(),
+  status text DEFAULT 'active'::text,
+  CONSTRAINT candidates_pkey PRIMARY KEY (id),
+  CONSTRAINT candidates_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);
+CREATE TABLE public.contact_messages (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  request_id uuid NOT NULL,
+  sender_role USER-DEFINED NOT NULL,
+  body text NOT NULL,
+  delivery USER-DEFINED DEFAULT 'InApp'::message_delivery,
+  status USER-DEFINED DEFAULT 'Sent'::message_status,
+  created_at timestamp with time zone DEFAULT now(),
+  meta jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT contact_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT contact_messages_request_id_fkey FOREIGN KEY (request_id) REFERENCES public.contact_requests(id)
+);
+CREATE TABLE public.contact_requests (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  from_advertiser_id uuid NOT NULL,
+  to_creator_id uuid NOT NULL,
+  deal_id uuid,
+  subject text NOT NULL,
+  status USER-DEFINED DEFAULT 'Open'::contact_status,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  last_message_at timestamp with time zone,
+  rate_window jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT contact_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT contact_requests_from_advertiser_id_fkey FOREIGN KEY (from_advertiser_id) REFERENCES public.identities(id),
+  CONSTRAINT contact_requests_to_creator_id_fkey FOREIGN KEY (to_creator_id) REFERENCES public.identities(id),
+  CONSTRAINT contact_requests_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);
+CREATE TABLE public.contact_settings (
+  creator_id uuid NOT NULL,
+  inbound_allowed boolean DEFAULT true,
+  prefer_email boolean DEFAULT false,
+  relay_email text,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT contact_settings_pkey PRIMARY KEY (creator_id),
+  CONSTRAINT contact_settings_creator_id_fkey FOREIGN KEY (creator_id) REFERENCES public.identities(id)
+);
+CREATE TABLE public.deal_media (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  deal_id uuid,
+  uploaded_by uuid,
+  file_name text NOT NULL,
+  original_name text NOT NULL,
+  file_type text NOT NULL CHECK (file_type = ANY (ARRAY['image'::text, 'video'::text])),
+  file_size bigint NOT NULL,
+  mime_type text NOT NULL,
+  storage_url text NOT NULL,
+  description text DEFAULT ''::text,
+  analysis_priority text DEFAULT 'medium'::text CHECK (analysis_priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT deal_media_pkey PRIMARY KEY (id),
+  CONSTRAINT deal_media_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id),
+  CONSTRAINT deal_media_uploaded_by_fkey FOREIGN KEY (uploaded_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.deals (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  advertiser_id uuid NOT NULL,
+  creator_id uuid,
+  platform USER-DEFINED NOT NULL,
+  account_id uuid NOT NULL,
+  amount_usdc numeric NOT NULL,
+  credit_applied numeric DEFAULT 0,
+  deadline_iso timestamp with time zone NOT NULL,
+  status USER-DEFINED DEFAULT 'PendingAcceptance'::deal_status,
+  public_opt_in boolean DEFAULT false,
+  posted_at timestamp with time zone,
+  handle_visibility boolean DEFAULT true,
+  cancelled_at timestamp with time zone,
+  cancelled_by uuid,
+  hard_expired_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  post_url text,
+  orchestrator_result jsonb,
+  verification_score integer,
+  failure_reason text,
+  verification_notes text,
+  last_verification_at timestamp with time zone,
+  next_verification_at timestamp with time zone,
+  media_count integer DEFAULT 0,
+  has_media_descriptions boolean DEFAULT false,
+  CONSTRAINT deals_pkey PRIMARY KEY (id),
+  CONSTRAINT deals_advertiser_id_fkey FOREIGN KEY (advertiser_id) REFERENCES public.identities(id),
+  CONSTRAINT deals_creator_id_fkey FOREIGN KEY (creator_id) REFERENCES public.identities(id),
+  CONSTRAINT deals_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.platform_accounts(id),
+  CONSTRAINT deals_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public.identities(id)
+);
+CREATE TABLE public.escrow_events (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  deal_id uuid NOT NULL,
+  event_type USER-DEFINED NOT NULL,
+  amount_usdc numeric NOT NULL,
+  tx_ref text,
+  ts timestamp with time zone DEFAULT now(),
+  solana_signature text,
+  solana_escrow_pda text,
+  payment_method text DEFAULT 'stripe'::text CHECK (payment_method = ANY (ARRAY['stripe'::text, 'solana'::text])),
+  CONSTRAINT escrow_events_pkey PRIMARY KEY (id),
+  CONSTRAINT escrow_events_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);
+CREATE TABLE public.hitl_events (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  review_id uuid NOT NULL,
+  event_type text NOT NULL CHECK (event_type = ANY (ARRAY['NOTIFIED'::text, 'REMINDED'::text, 'ESCALATED'::text])),
+  payload jsonb DEFAULT '{}'::jsonb,
+  delivered boolean DEFAULT false,
+  attempts integer DEFAULT 0,
+  last_attempt_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT hitl_events_pkey PRIMARY KEY (id),
+  CONSTRAINT hitl_events_review_id_fkey FOREIGN KEY (review_id) REFERENCES public.reviews(id)
+);
+CREATE TABLE public.identities (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  type USER-DEFINED NOT NULL,
+  email text,
+  wallet text,
+  role USER-DEFINED DEFAULT 'advertiser'::user_role,
+  tags jsonb DEFAULT '[]'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  stripe_connect_account_id text,
+  stripe_onboarding_completed boolean DEFAULT false,
+  stripe_payouts_enabled boolean DEFAULT false,
+  stripe_details_submitted boolean DEFAULT false,
+  solana_wallet_address text,
+  solana_wallet_connected_at timestamp with time zone,
+  CONSTRAINT identities_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.notifications (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  deal_id uuid,
+  type text NOT NULL,
+  title text NOT NULL,
+  message text NOT NULL,
+  read_at timestamp with time zone,
+  email_sent boolean DEFAULT false,
+  email_sent_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  metadata jsonb,
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT notifications_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);
+CREATE TABLE public.observations (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  run_id uuid NOT NULL,
+  step_id uuid,
+  modality USER-DEFINED NOT NULL,
+  description text NOT NULL,
+  confidence numeric CHECK (confidence >= 0::numeric AND confidence <= 1::numeric),
+  source text,
+  matched_value text,
+  manual_override boolean DEFAULT false,
+  surface_type text,
+  ephemeral_window_start timestamp with time zone,
+  ephemeral_window_end timestamp with time zone,
+  CONSTRAINT observations_pkey PRIMARY KEY (id),
+  CONSTRAINT observations_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.runs(id),
+  CONSTRAINT observations_step_id_fkey FOREIGN KEY (step_id) REFERENCES public.steps(id)
+);
+CREATE TABLE public.payouts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  deal_id uuid NOT NULL,
+  method USER-DEFINED NOT NULL,
+  status USER-DEFINED DEFAULT 'Initiated'::payout_status,
+  provider_ref text,
+  ts timestamp with time zone DEFAULT now(),
+  stripe_transfer_id text,
+  destination_account_id text,
+  amount_usdc numeric,
+  failure_reason text,
+  solana_signature text,
+  CONSTRAINT payouts_pkey PRIMARY KEY (id),
+  CONSTRAINT payouts_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);
+CREATE TABLE public.platform_accounts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  platform USER-DEFINED NOT NULL,
+  account_url text NOT NULL,
+  normalized_handle text NOT NULL,
+  last_seen_public timestamp with time zone,
+  tags jsonb DEFAULT '[]'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT platform_accounts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.proof_specs (
+  deal_id uuid NOT NULL,
+  text_proof text,
+  duration_hours numeric DEFAULT 24,
+  normalized_json jsonb,
+  cohesion_flag boolean DEFAULT false,
+  spec_sha256 text,
+  visual_markers jsonb DEFAULT '[]'::jsonb,
+  video_markers jsonb DEFAULT '[]'::jsonb,
+  link_markers jsonb DEFAULT '[]'::jsonb,
+  CONSTRAINT proof_specs_pkey PRIMARY KEY (deal_id),
+  CONSTRAINT proof_specs_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);
+CREATE TABLE public.proof_wall (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  deal_id uuid NOT NULL,
+  platform USER-DEFINED NOT NULL,
+  category text,
+  price_range_bucket text,
+  outcome text NOT NULL,
+  account_url text NOT NULL,
+  escrow_tx_link text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT proof_wall_pkey PRIMARY KEY (id),
+  CONSTRAINT proof_wall_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);
+CREATE TABLE public.refunds (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  deal_id uuid NOT NULL,
+  amount_usdc numeric NOT NULL,
+  reason text NOT NULL,
+  stripe_refund_id text,
+  status text DEFAULT 'pending'::text,
+  initiated_by uuid,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT refunds_pkey PRIMARY KEY (id),
+  CONSTRAINT refunds_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id),
+  CONSTRAINT refunds_initiated_by_fkey FOREIGN KEY (initiated_by) REFERENCES public.identities(id)
+);
+CREATE TABLE public.review_assignments (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  review_id uuid NOT NULL,
+  reviewer_id uuid NOT NULL,
+  assigned_at timestamp with time zone DEFAULT now(),
+  assigned_by uuid,
+  notes text,
+  CONSTRAINT review_assignments_pkey PRIMARY KEY (id),
+  CONSTRAINT review_assignments_review_id_fkey FOREIGN KEY (review_id) REFERENCES public.reviews(id),
+  CONSTRAINT review_assignments_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.identities(id),
+  CONSTRAINT review_assignments_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.identities(id)
+);
+CREATE TABLE public.reviews (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  deal_id uuid NOT NULL,
+  run_id uuid,
+  opened_at timestamp with time zone DEFAULT now(),
+  closed_at timestamp with time zone,
+  reviewer_id uuid,
+  decision USER-DEFINED,
+  reason_code text,
+  notes text,
+  priority text DEFAULT 'medium'::text,
+  status text DEFAULT 'Open'::text,
+  CONSTRAINT reviews_pkey PRIMARY KEY (id),
+  CONSTRAINT reviews_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id),
+  CONSTRAINT reviews_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.runs(id),
+  CONSTRAINT reviews_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.identities(id)
+);
+CREATE TABLE public.runs (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  deal_id uuid NOT NULL,
+  started_at timestamp with time zone DEFAULT now(),
+  completed_at timestamp with time zone,
+  status USER-DEFINED DEFAULT 'pending'::run_status,
+  proof_outcome USER-DEFINED,
+  access_outcome text,
+  access_outcome_details text,
+  model_versions jsonb DEFAULT '{}'::jsonb,
+  prompt_template_sha text,
+  notes text,
+  CONSTRAINT runs_pkey PRIMARY KEY (id),
+  CONSTRAINT runs_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);
+CREATE TABLE public.sessions (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  identity_id uuid NOT NULL,
+  refresh_token_hash text NOT NULL,
+  ua text,
+  created_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone NOT NULL,
+  CONSTRAINT sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT sessions_identity_id_fkey FOREIGN KEY (identity_id) REFERENCES public.identities(id)
+);
+CREATE TABLE public.steps (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  run_id uuid NOT NULL,
+  ts timestamp with time zone DEFAULT now(),
+  action text NOT NULL,
+  surface_detected boolean,
+  status USER-DEFINED DEFAULT 'pending'::step_status,
+  CONSTRAINT steps_pkey PRIMARY KEY (id),
+  CONSTRAINT steps_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.runs(id)
+);
+CREATE TABLE public.verification_schedules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  deal_id uuid,
+  scheduled_at timestamp with time zone NOT NULL,
+  check_type text NOT NULL CHECK (check_type = ANY (ARRAY['initial'::text, 'periodic'::text, 'final'::text, 'manual'::text])),
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])),
+  orchestrator_request_id text,
+  result jsonb,
+  confidence_score integer,
+  requirements_met ARRAY,
+  requirements_failed ARRAY,
+  created_at timestamp with time zone DEFAULT now(),
+  completed_at timestamp with time zone,
+  CONSTRAINT verification_schedules_pkey PRIMARY KEY (id),
+  CONSTRAINT verification_schedules_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id)
+);

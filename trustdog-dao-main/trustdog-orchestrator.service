@@ -1,0 +1,41 @@
+[Unit]
+Description=TrustDog Ultimate Orchestrator API Server
+After=network.target tor.service
+
+[Service]
+Type=simple
+User=s
+WorkingDirectory=/home/s/trustdog
+ExecStart=/usr/bin/node api-server.js
+Restart=always
+RestartSec=10
+
+# Environment variables
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=PATH=/home/s/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PLAYWRIGHT_BROWSERS_PATH=/home/s/trustdog/browsers
+Environment=HOME=/home/s
+
+# API Keys and Configuration
+Environment=ORCHESTRATOR_API_KEY=fa3dc912b8536ba1d6f18abfeaa588144f198aba2e4d2a5e2ac932dbcd185784
+Environment=QWEN_KEY=sk-3154176795dd40969654a6efb517ab0a
+Environment=DASHSCOPE_API_KEY=sk-3154176795dd40969654a6efb517ab0a
+Environment=QWEN_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+Environment=SUPABASE_URL=https://qhmfkugenksiyzyfbsnc.supabase.co
+Environment=SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFobWZrdWdlbmtzaXl6eWZic25jIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyODQxMDQ4NCwiZXhwIjoyMDQ0OTg2NDg0fQ.JQJGvwJvK-OPh9hs7LCVm_cW_lkPJY9Z_qT_-F2WK9Q
+Environment=BROWSERLESS_URL=https://production-sfo.browserless.io/function?token=30d91e97-9a84-4c5b-b655-e3ee6b6edeb8
+
+# Logging
+StandardOutput=append:/home/s/trustdog/orchestrator.log
+StandardError=append:/home/s/trustdog/orchestrator.log
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+# Dependencies
+Wants=tor.service
+
+[Install]
+WantedBy=multi-user.target

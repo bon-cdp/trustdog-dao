@@ -1,0 +1,24 @@
+[Unit]
+Description=TrustDog ngrok Tunnel
+After=network.target trustdog-orchestrator.service
+
+[Service]
+Type=simple
+User=s
+WorkingDirectory=/home/s/trustdog
+ExecStart=/usr/local/bin/ngrok http 3001 --url=unwhelped-confessingly-gena.ngrok-free.app --pooling-enabled
+Restart=always
+RestartSec=15
+
+# Environment
+Environment=HOME=/home/s
+
+# Logging
+StandardOutput=append:/home/s/trustdog/ngrok.log
+StandardError=append:/home/s/trustdog/ngrok.log
+
+# Security
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
